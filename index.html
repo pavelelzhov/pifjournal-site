@@ -1139,7 +1139,7 @@ Tейк-профит
         <div class="card" style="padding:12px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
             <div>
-              <div style="font-weight:700">☁ Облако (Supabase) — PROD v4</div>
+              <div style="font-weight:700">☁ Облако (Supabase) — PROD v5</div>
               <div class="mini">Автосинхронизация: изменения будут уходить в облако сами (с задержкой ~10 сек).</div>
             </div>
             <label style="display:flex;align-items:center;gap:8px">
@@ -1181,7 +1181,56 @@ Tейк-профит
           </div>
 
           <div id="cloudStatus" class="mini" style="margin-top:8px">Облако: не настроено</div>
-          <div id="cloudDebug" class="mini" style="margin-top:6px; opacity:.85">Cloud build: prod-v4</div>
+          <div id="cloudDebug" class="mini" style="margin-top:6px; opacity:.85">Cloud build: prod-v5</div>
+        </div>
+
+
+        <div class="hr"></div>
+
+        <div class="card hidden" id="teamCard" style="padding:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <div>
+              <div style="font-weight:700">👥 Команда (ADMIN)</div>
+              <div class="mini">Список трейдеров, просмотр их журналов и аудит изменений.</div>
+            </div>
+            <div class="pill ok" id="myRolePill">ROLE</div>
+          </div>
+
+          <div class="hr"></div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btnGhost" id="btnTeamRefresh">Обновить список</button>
+            <button class="btnGhost" id="btnTeamBack">Вернуться к моему журналу</button>
+          </div>
+
+          <div class="hr"></div>
+          <div class="mini">Трейдеры (email):</div>
+          <div id="traderList" style="margin-top:6px"></div>
+
+          <div class="hr"></div>
+          <div class="mini">Аудит (последние 50 событий выбранного трейдера):</div>
+          <pre id="auditBox" style="white-space:pre-wrap; max-height:220px; overflow:auto; padding:10px; border:1px solid #2a2a2a; border-radius:12px; background:#0f0f0f;"></pre>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="card" id="parserCard" style="padding:12px">
+          <div style="font-weight:700">🧩 Парсер сигналов</div>
+          <div class="mini">Вставь текст сигнала (любая мешанина RU/EN). Нажми «Распарсить» и «Добавить в журнал».</div>
+
+          <div class="hr"></div>
+
+          <textarea class="inp" id="sigText" style="width:100%; min-height:140px; font-family: ui-monospace,Consolas,monospace" placeholder="Вставь сюда сигнал..."></textarea>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+            <button class="btnGhost" id="btnSigParse">Распарсить</button>
+            <button class="btnGhost" id="btnSigAdd" disabled>Добавить в журнал</button>
+            <button class="btnGhost" id="btnSigClear">Очистить</button>
+          </div>
+
+          <div class="hr"></div>
+          <div class="mini">Результат парсинга:</div>
+          <pre id="sigPreview" style="white-space:pre-wrap; max-height:240px; overflow:auto; padding:10px; border:1px solid #2a2a2a; border-radius:12px; background:#0f0f0f;"></pre>
         </div>
 
 <div class="mini">
@@ -4895,8 +4944,9 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
 
 
 
+
 <script>
-/* PIFJOURNAL SUPABASE CLOUD PROD v4 (AUTOLOAD) */
+/* PIFJOURNAL SUPABASE CLOUD PROD v5 (TEAM + AUDIT + PARSER) */
 (function(){
   function $(id){ return document.getElementById(id); }
   function setDbg(s){ var el=$("cloudDebug"); if(el) el.textContent=s; }
@@ -4906,9 +4956,19 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
   const K_ACCESS="PIF_SB_ACCESS", K_REFRESH="PIF_SB_REFRESH", K_USER="PIF_SB_USER";
   const K_AUTO="PIF_SB_AUTO";
   const K_LAST_PUSH_HASH="PIF_SB_LAST_PUSH_HASH";
+  const K_ROLE="PIF_ROLE";
+  const K_VIEW_USER="PIF_VIEW_USER";
 
   const LCFG = (typeof LS_CFG!=="undefined") ? LS_CFG : "tj.v43.cfg";
   const LTRD = (typeof LS_TRADES!=="undefined") ? LS_TRADES : "tj.v43.trades";
+
+  function uuid(){
+    if (typeof crypto!=="undefined" && crypto.randomUUID) return crypto.randomUUID();
+    // fallback
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,function(c){
+      var r=Math.random()*16|0,v=c==="x"?r:(r&0x3|0x8); return v.toString(16);
+    });
+  }
 
   function getAuto(){ return (localStorage.getItem(K_AUTO) || "1")==="1"; }
   function setAuto(v){ localStorage.setItem(K_AUTO, v ? "1":"0"); }
@@ -4925,7 +4985,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     localStorage.setItem(K_URL, url);
     localStorage.setItem(K_KEY, key);
     setStatus("Облако: настройки сохранены ✅");
-    setDbg("Cloud build: prod-v4 • conn saved");
+    setDbg("Cloud build: prod-v5 • conn saved");
   }
 
   function getEmailPass(){
@@ -4960,6 +5020,8 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     localStorage.removeItem(K_ACCESS);
     localStorage.removeItem(K_REFRESH);
     localStorage.removeItem(K_USER);
+    localStorage.removeItem(K_ROLE);
+    localStorage.removeItem(K_VIEW_USER);
   }
   function getSession(){
     return {
@@ -4970,13 +5032,18 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     };
   }
 
+  function restBase(url){ return url.replace(/\/$/,"") + "/rest/v1/"; }
+  function authHeaders(key, access){
+    return { "apikey": key, "Authorization": "Bearer " + access };
+  }
+
   async function loginRaw(opts){
     const {url,key} = getConn();
     if(!url || !key){ if(!(opts&&opts.silent)) alert("Сначала нажми «Сохранить облако»"); return; }
     const {email, pass} = getEmailPass();
     if(!email || !pass){ if(!(opts&&opts.silent)) alert("Введи email и пароль"); return; }
     setStatus("Облако: логин…");
-    setDbg("Cloud build: prod-v4 • auth…");
+    setDbg("Cloud build: prod-v5 • auth…");
     const tokenUrl = url.replace(/\/$/,"") + "/auth/v1/token?grant_type=password";
     const tok = await fetchJson(tokenUrl, {
       method:"POST",
@@ -4989,7 +5056,12 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     if(!access || !refresh || !userId) throw new Error("Нет access/refresh/user.id");
     storeSession(access, refresh, userId, email);
     setStatus("Облако: вход выполнен ✅");
-    setDbg("Cloud build: prod-v4 • user=" + userId);
+    setDbg("Cloud build: prod-v5 • user=" + userId);
+
+    // role + profile
+    try{ await refreshRoleAndProfile(); }catch(e){}
+
+    // сразу подгружаем сделки
     try{ await pullNow({silent:true}); }catch(e){}
   }
 
@@ -5029,33 +5101,56 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     }catch(e){ return String(Math.random()); }
   }
 
+  function getViewUser(){ return localStorage.getItem(K_VIEW_USER) || ""; }
+  function setViewUser(uid){ if(uid) localStorage.setItem(K_VIEW_USER, uid); else localStorage.removeItem(K_VIEW_USER); }
+
+  async function readCloudRow(userId, access, url, key){
+    const readUrl = restBase(url) + "tj_v12_state?select=cfg,trades,updated_at&user_id=eq." + encodeURIComponent(userId);
+    const rows = await fetchJson(readUrl, { headers: { ...authHeaders(key, access) }});
+    return (rows && rows[0]) ? rows[0] : null;
+  }
+
   async function pushNow(opts){
     const {url,key} = getConn();
     let sess = await ensureAccessToken();
     if(!sess.access || !sess.userId){ if(!(opts&&opts.silent)) alert("Сначала «Войти»"); return; }
+
+    // block pushing while admin viewing other trader
+    const viewUser = getViewUser();
+    if(viewUser && viewUser !== sess.userId){
+      if(!(opts&&opts.silent)) alert("Ты в режиме просмотра другого трейдера. Нельзя сохранять в облако. Нажми «Вернуться к моему журналу».");
+      return;
+    }
 
     const st = getLocalState();
     const h = stableHash(st);
     const last = localStorage.getItem(K_LAST_PUSH_HASH)||"";
     if(h===last){ if(!(opts&&opts.silent)) setStatus("Облако: уже актуально ✅"); return; }
 
+    // audit: get previous cloud state (best-effort)
+    let prevRow = null;
+    try{ prevRow = await readCloudRow(sess.userId, sess.access, url, key); }catch(e){}
+
     setStatus("Облако: сохраняю…");
-    setDbg("Cloud build: prod-v4 • push…");
-    const restUrl = url.replace(/\/$/,"") + "/rest/v1/tj_v12_state?on_conflict=user_id";
+    setDbg("Cloud build: prod-v5 • push…");
+    const restUrl = restBase(url) + "tj_v12_state?on_conflict=user_id";
     const payload = [{ user_id: sess.userId, cfg: st.cfg, trades: st.trades }];
     await fetchJson(restUrl, {
       method:"POST",
       headers:{
-        "apikey": key,
-        "Authorization": "Bearer " + sess.access,
+        ...authHeaders(key, sess.access),
         "Content-Type":"application/json",
         "Prefer":"resolution=merge-duplicates,return=representation"
       },
       body: JSON.stringify(payload)
     });
+
+    // write audit rows (best-effort)
+    try{ await writeAudit(prevRow, st, sess, url, key); }catch(e){}
+
     localStorage.setItem(K_LAST_PUSH_HASH, h);
     setStatus("Облако: сохранено ✅ ("+new Date().toLocaleTimeString()+")");
-    setDbg("Cloud build: prod-v4 • push ok • trades=" + st.trades.length);
+    setDbg("Cloud build: prod-v5 • push ok • trades=" + st.trades.length);
   }
 
   async function pullNow(opts){
@@ -5063,18 +5158,20 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     let sess = await ensureAccessToken();
     if(!sess.access || !sess.userId){ if(!(opts&&opts.silent)) alert("Сначала «Войти»"); return; }
 
-    setStatus("Облако: загружаю…");
-    setDbg("Cloud build: prod-v4 • pull…");
-    const readUrl = url.replace(/\/$/,"") + "/rest/v1/tj_v12_state?select=cfg,trades,updated_at&user_id=eq." + encodeURIComponent(sess.userId);
-    const rows = await fetchJson(readUrl, { headers:{ "apikey": key, "Authorization":"Bearer " + sess.access }});
-    if(!rows || !rows.length){
+    const targetUser = getViewUser() || sess.userId;
+
+    setStatus(targetUser===sess.userId ? "Облако: загружаю…" : "Облако: загружаю журнал трейдера…");
+    setDbg("Cloud build: prod-v5 • pull…");
+
+    const row = await readCloudRow(targetUser, sess.access, url, key);
+    if(!row){
       setStatus("Облако: пусто");
       return;
     }
-    const row = rows[0]||{};
     const cloudTrades = Array.isArray(row.trades)?row.trades:[];
     const cloudCfg = row.cfg||{};
 
+    // apply to localStorage keys (viewer mode overwrites local; we protect by disabling push)
     localStorage.setItem(LCFG, JSON.stringify(cloudCfg));
     localStorage.setItem(LTRD, JSON.stringify(cloudTrades));
 
@@ -5086,18 +5183,32 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
 
     localStorage.setItem(K_LAST_PUSH_HASH, stableHash(getLocalState()));
     setStatus("Облако: загружено ✅ ("+new Date().toLocaleTimeString()+")");
-    setDbg("Cloud build: prod-v4 • pull ok • trades=" + cloudTrades.length);
+    setDbg("Cloud build: prod-v5 • pull ok • trades=" + cloudTrades.length);
+
+    // banner
+    const banner = $("adminViewBanner");
+    if(banner){
+      banner.style.display = (getViewUser() && getViewUser()!==sess.userId) ? "block" : "none";
+    }
   }
 
   function logoutNow(){
     clearSession();
     setStatus("Облако: выход");
-    setDbg("Cloud build: prod-v4 • logout");
+    setDbg("Cloud build: prod-v5 • logout");
+    try{ const banner=$("adminViewBanner"); if(banner) banner.style.display="none"; }catch(e){}
+    try{ $("teamCard").classList.add("hidden"); }catch(e){}
   }
 
+  // --- AUTOSYNC ---
   let autoTimer=null;
   function schedule(){
     if(!getAuto()) return;
+    // don't autosync in viewer mode
+    const sess = getSession();
+    const viewUser = getViewUser();
+    if(viewUser && viewUser !== sess.userId) return;
+
     if(autoTimer) clearTimeout(autoTimer);
     autoTimer=setTimeout(()=>pushNow({silent:true}).catch(()=>{}), 8000);
   }
@@ -5121,6 +5232,437 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     }catch(e){}
   }
 
+  // --- ROLE + PROFILE + TEAM ---
+  async function getMyRole(sess, url, key){
+    try{
+      const q = restBase(url) + 'user_roles?select=role&user_id=eq.' + encodeURIComponent(sess.userId) + '&limit=1';
+      const rows = await fetchJson(q, { headers: { ...authHeaders(key, sess.access) }});
+      const role = rows && rows[0] && rows[0].role ? rows[0].role : "TRADER";
+      localStorage.setItem(K_ROLE, role);
+      return role;
+    }catch(e){
+      return (localStorage.getItem(K_ROLE) || "TRADER");
+    }
+  }
+
+  async function ensureTraderProfile(sess, url, key){
+    // create/update own profile row (requires table trader_profiles)
+    const payload = [{ user_id: sess.userId, email: sess.email || (localStorage.getItem(K_EMAIL)||"") }];
+    const ep = restBase(url) + "trader_profiles?on_conflict=user_id";
+    await fetchJson(ep, {
+      method:"POST",
+      headers:{
+        ...authHeaders(key, sess.access),
+        "Content-Type":"application/json",
+        "Prefer":"resolution=merge-duplicates,return=minimal"
+      },
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async function refreshRoleAndProfile(){
+    const {url,key} = getConn();
+    let sess = await ensureAccessToken();
+    if(!sess.access || !sess.userId) return;
+
+    const role = await getMyRole(sess, url, key);
+    // update pill
+    try{
+      const p = $("myRolePill");
+      if(p){ p.textContent = role; p.className = "pill " + (role==="ADMIN" ? "ok" : ""); }
+    }catch(e){}
+
+    // ensure profile (best-effort)
+    try{ await ensureTraderProfile(sess, url, key); }catch(e){
+      // ignore: user may not have run migration yet
+    }
+
+    // show team card for ADMIN
+    try{
+      const card = $("teamCard");
+      if(card){
+        if(role==="ADMIN") card.classList.remove("hidden");
+        else card.classList.add("hidden");
+      }
+    }catch(e){}
+  }
+
+  async function loadTraderList(){
+    const {url,key} = getConn();
+    let sess = await ensureAccessToken();
+    if(!sess.access || !sess.userId) return;
+
+    const role = localStorage.getItem(K_ROLE) || "TRADER";
+    if(role!=="ADMIN") return;
+
+    const box = $("traderList");
+    if(!box) return;
+
+    box.innerHTML = '<div class="mini">Загрузка…</div>';
+    try{
+      const q = restBase(url) + "trader_profiles?select=user_id,email,display_name,updated_at,created_at&order=email.asc";
+      const rows = await fetchJson(q, { headers: { ...authHeaders(key, sess.access) }});
+      if(!rows || !rows.length){
+        box.innerHTML = '<div class="mini">Пусто. Трейдер появится здесь после первого входа (или после миграции).</div>';
+        return;
+      }
+
+      const viewUser = getViewUser();
+      let html = '<table style="width:100%; border-collapse:collapse">';
+      html += '<tr><th style="text-align:left; padding:6px">email</th><th style="text-align:left; padding:6px">uid</th><th style="padding:6px">действия</th></tr>';
+      for(const r of rows){
+        const email = r.email || r.display_name || "(no email)";
+        const uid = r.user_id;
+        const isMe = (uid === sess.userId);
+        const isViewing = (viewUser === uid);
+        html += '<tr style="border-top:1px solid #222">';
+        html += '<td style="padding:6px">'+escapeHtml(email) + (isMe?' <span class="pill ok">ME</span>':'') + (isViewing?' <span class="pill warn">VIEW</span>':'') + '</td>';
+        html += '<td style="padding:6px; font-family: ui-monospace,Consolas,monospace; font-size:12px">'+escapeHtml(uid)+'</td>';
+        html += '<td style="padding:6px; text-align:right">';
+        html += '<button class="btnGhost btnViewTrader" data-uid="'+uid+'">Открыть</button> ';
+        html += '<button class="btnGhost btnExportTrader" data-uid="'+uid+'" data-email="'+escapeAttr(email)+'">Экспорт</button> ';
+        html += '<button class="btnGhost btnAuditTrader" data-uid="'+uid+'">Аудит</button>';
+        html += '</td></tr>';
+      }
+      html += '</table>';
+      box.innerHTML = html;
+
+      // bind buttons
+      for(const b of box.querySelectorAll(".btnViewTrader")){
+        b.onclick = async ()=>{ await adminViewTrader(b.dataset.uid); };
+      }
+      for(const b of box.querySelectorAll(".btnExportTrader")){
+        b.onclick = async ()=>{ await exportTrader(b.dataset.uid, b.dataset.email); };
+      }
+      for(const b of box.querySelectorAll(".btnAuditTrader")){
+        b.onclick = async ()=>{ await loadAudit(b.dataset.uid); };
+      }
+
+    }catch(e){
+      box.innerHTML = '<div class="mini">Ошибка: '+escapeHtml(e.message||String(e))+'</div>';
+    }
+  }
+
+  async function adminViewTrader(uid){
+    const {url,key} = getConn();
+    let sess = await ensureAccessToken();
+    if(!sess.access || !sess.userId) return;
+
+    const role = localStorage.getItem(K_ROLE) || "TRADER";
+    if(role!=="ADMIN"){ alert("Только ADMIN"); return; }
+
+    // if viewing someone else, disable autosync
+    if(uid && uid !== sess.userId){
+      setViewUser(uid);
+      setAuto(false);
+      try{ const chk=$("cloudAuto"); if(chk) chk.checked=false; }catch(e){}
+      try{ const banner=$("adminViewBanner"); if(banner) banner.style.display="block"; }catch(e){}
+    } else {
+      setViewUser("");
+      setAuto(true);
+      try{ const chk=$("cloudAuto"); if(chk) chk.checked=true; }catch(e){}
+      try{ const banner=$("adminViewBanner"); if(banner) banner.style.display="none"; }catch(e){}
+    }
+    await pullNow({silent:true});
+  }
+
+  async function exportTrader(uid, email){
+    const {url,key} = getConn();
+    let sess = await ensureAccessToken();
+    if(!sess.access || !sess.userId) return;
+
+    const role = localStorage.getItem(K_ROLE) || "TRADER";
+    if(role!=="ADMIN" && uid!==sess.userId){ alert("Только ADMIN"); return; }
+
+    const row = await readCloudRow(uid, sess.access, url, key);
+    const blob = new Blob([JSON.stringify(row || {}, null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "journal_" + (email||uid).replace(/[^a-zA-Z0-9._-]/g,"_") + ".json";
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1500);
+  }
+
+  async function loadAudit(uid){
+    const {url,key} = getConn();
+    let sess = await ensureAccessToken();
+    if(!sess.access || !sess.userId) return;
+
+    const role = localStorage.getItem(K_ROLE) || "TRADER";
+    if(role!=="ADMIN" && uid!==sess.userId){ alert("Только ADMIN"); return; }
+
+    const box = $("auditBox");
+    if(box) box.textContent = "Загрузка...";
+    try{
+      const q = restBase(url) + "audit_log?select=created_at,action,trade_id,actor_id,meta&owner_user_id=eq." + encodeURIComponent(uid) + "&order=created_at.desc&limit=50";
+      const rows = await fetchJson(q, { headers: { ...authHeaders(key, sess.access) }});
+      if(!rows || !rows.length){ if(box) box.textContent="Пусто."; return; }
+      if(box) box.textContent = rows.map(r=>`${r.created_at}  ${r.action}  trade=${r.trade_id||"-"}  actor=${(r.actor_id||"").slice(0,8)}  meta=${JSON.stringify(r.meta||{})}`).join("\n");
+    }catch(e){
+      if(box) box.textContent = "Ошибка: " + (e.message||String(e)) + "\n\nПодсказка: возможно не применена миграция (audit_log).";
+    }
+  }
+
+  // --- AUDIT (best-effort) ---
+  function mapById(arr){
+    const m = new Map();
+    for(const t of (arr||[])){
+      if(t && t.id) m.set(t.id, t);
+    }
+    return m;
+  }
+  function jsonEq(a,b){
+    try{ return JSON.stringify(a)===JSON.stringify(b); }catch(e){ return false; }
+  }
+
+  async function writeAudit(prevRow, localState, sess, url, key){
+    // requires audit_log table; ignore if missing
+    const prevTrades = (prevRow && Array.isArray(prevRow.trades)) ? prevRow.trades : [];
+    const nextTrades = localState.trades || [];
+
+    const prev = mapById(prevTrades);
+    const next = mapById(nextTrades);
+
+    const inserts=[], updates=[], deletes=[];
+    for(const [id, t] of next.entries()){
+      if(!prev.has(id)) inserts.push({id, after:t});
+      else {
+        const old = prev.get(id);
+        if(!jsonEq(old, t)) updates.push({id, before:old, after:t});
+      }
+    }
+    for(const [id, t] of prev.entries()){
+      if(!next.has(id)) deletes.push({id, before:t});
+    }
+
+    const total = inserts.length + updates.length + deletes.length;
+    if(total===0) return;
+
+    const maxDetailed = 50;
+    const rows = [];
+    const ts = new Date().toISOString();
+
+    if(total > maxDetailed){
+      rows.push({
+        owner_user_id: sess.userId,
+        actor_id: sess.userId,
+        action: "BULK_SYNC",
+        trade_id: null,
+        meta: { inserted: inserts.length, updated: updates.length, deleted: deletes.length, ts }
+      });
+    } else {
+      for(const x of inserts){
+        rows.push({ owner_user_id: sess.userId, actor_id: sess.userId, action:"INSERT", trade_id:x.id, before:null, after:x.after, meta:{ts} });
+      }
+      for(const x of updates){
+        rows.push({ owner_user_id: sess.userId, actor_id: sess.userId, action:"UPDATE", trade_id:x.id, before:x.before, after:x.after, meta:{ts} });
+      }
+      for(const x of deletes){
+        rows.push({ owner_user_id: sess.userId, actor_id: sess.userId, action:"DELETE", trade_id:x.id, before:x.before, after:null, meta:{ts} });
+      }
+    }
+
+    const ep = restBase(url) + "audit_log";
+    await fetchJson(ep, {
+      method:"POST",
+      headers:{
+        ...authHeaders(key, sess.access),
+        "Content-Type":"application/json",
+        "Prefer":"return=minimal"
+      },
+      body: JSON.stringify(rows)
+    });
+  }
+
+  // --- PARSER ---
+  function normText(s){
+    return (s||"")
+      .replace(/\u00A0/g," ")
+      .replace(/[—–]/g,"-")
+      .replace(/,/g,".")
+      .replace(/(\d)\s+(?=\d)/g,"$1") // 1 924.95 -> 1924.95
+      .trim();
+  }
+  function escapeHtml(s){
+    return String(s||"").replace(/[&<>"]/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+  }
+  function escapeAttr(s){
+    return String(s||"").replace(/"/g,"&quot;");
+  }
+  function findSymbol(up){
+    const m = up.match(/\b[0-9A-Z]{2,15}USDT\b/);
+    return m ? m[0] : null;
+  }
+  function findSide(t){
+    const up=t.toUpperCase();
+    if(/\b(LONG|ЛОНГ)\b/.test(up)) return "LONG";
+    if(/\b(SHORT|ШОРТ)\b/.test(up)) return "SHORT";
+    // emoji
+    if(t.includes("🐂")) return "LONG";
+    if(t.includes("🐻")) return "SHORT";
+    return null;
+  }
+  function pickNumberAfterLabel(line){
+    const m = line.match(/[:@]\s*(-?\d+(?:\.\d+)?)/);
+    return m ? Number(m[1]) : null;
+  }
+  function pickByLabelFirst(text, re, skipRe){
+    const lines = text.split(/\n+/);
+    for(const line of lines){
+      if(skipRe && skipRe.test(line)) continue;
+      if(re.test(line)){
+        const v = pickNumberAfterLabel(line);
+        if(v!==null) return v;
+      }
+    }
+    return null;
+  }
+  function parseSignal(raw){
+    const text = normText(raw);
+    const up = text.toUpperCase();
+    const symbol = findSymbol(up);
+    const side = findSide(text);
+
+    // A/B only if line starts with A:/B:
+    const mA = text.match(/(?:^|\n)\s*(?:—\s*)?\bA\b\s*[^:@\n]*[:@]\s*(-?\d+(?:\.\d+)?)/i);
+    const mB = text.match(/(?:^|\n)\s*(?:—\s*)?\bB\b\s*[^:@\n]*[:@]\s*(-?\d+(?:\.\d+)?)/i);
+    const entryA = mA ? Number(mA[1]) : pickByLabelFirst(text, /(вход\s*с\s*текущих|entry|вход|лимит|limit|по\s*рынку|market)\s*[:@]/i, /(фазн|2-?\s*фаз)/i);
+    const entryB = mB ? Number(mB[1]) : pickByLabelFirst(text, /(усреднение|доливка|добор|dca)\s*[:@]/i);
+
+    const sl  = pickByLabelFirst(text, /(\bsl\b|стоп|stop)\s*[:@]/i);
+    const tp1 = pickByLabelFirst(text, /(tp\s*1|tp1|тейк\s*1|цель\s*1)\s*[:@]/i);
+    const tp2 = pickByLabelFirst(text, /(tp\s*2|tp2|тейк\s*2|цель\s*2)\s*[:@]/i);
+    const tp3 = pickByLabelFirst(text, /(tp\s*3|tp3|тейк\s*3|цель\s*3)\s*[:@]/i);
+
+    // risk
+    let risk = null;
+    for(const line of text.split(/\n+/)){
+      if(/(риск|risk)/i.test(line)){
+        const m = line.match(/(\d+(?:\.\d+)?)\s*%/);
+        if(m) risk = Number(m[1]);
+      }
+    }
+
+    // mode
+    let mode = null;
+    if(/#интрадей/i.test(text)) mode="intra";
+    if(/#среднесрок/i.test(text)) mode="mid";
+
+    // scale-ins (dolvka)
+    const scaleIns = [];
+    for(const line of text.split(/\n+/)){
+      if(/(доливка|добор|усреднение|dca)/i.test(line)){
+        const v = pickNumberAfterLabel(line);
+        if(v!==null) scaleIns.push(v);
+      }
+    }
+
+    const warnings=[];
+    if(!symbol) warnings.push("нет symbol");
+    if(!side) warnings.push("нет side");
+    if(entryA===null) warnings.push("нет entryA");
+    if(sl===null) warnings.push("нет SL");
+    if(tp1===null) warnings.push("нет TP1");
+
+    return { symbol, side, mode, entryA, entryB, sl, tp1, tp2, tp3, risk, scaleIns, warnings };
+  }
+
+  function previewParsed(p){
+    const lines = [];
+    lines.push("symbol: " + (p.symbol||"-"));
+    lines.push("side: " + (p.side||"-"));
+    lines.push("mode: " + (p.mode||"-"));
+    lines.push("entryA: " + (p.entryA??"-"));
+    lines.push("entryB: " + (p.entryB??"-"));
+    lines.push("SL: " + (p.sl??"-"));
+    lines.push("TP1: " + (p.tp1??"-"));
+    lines.push("TP2: " + (p.tp2??"-"));
+    lines.push("TP3: " + (p.tp3??"-"));
+    lines.push("risk%: " + (p.risk??"-"));
+    if(p.scaleIns && p.scaleIns.length) lines.push("scale-ins: " + p.scaleIns.join(", "));
+    if(p.warnings && p.warnings.length) lines.push("warnings: " + p.warnings.join(", "));
+    return lines.join("\n");
+  }
+
+  function addParsedToJournal(p){
+    const st = getLocalState();
+    const c = st.cfg || {};
+    const trader = c.traderDefault || c.trader || "A";
+    const mode = p.mode || c.modeDefault || "mid";
+    const allocs = (Array.isArray(c.tpAllocs) && c.tpAllocs.length>=3) ? c.tpAllocs : [50,40,10];
+
+    const now = new Date();
+    const iso = now.toISOString();
+    const date = iso.slice(0,10);
+
+    const trade = {
+      id: uuid(),
+      symbol: p.symbol,
+      side: p.side,
+      trader: trader,
+      mode: mode,
+      strat: "parsed",
+      notes: "",
+      market: "linear",
+      entryType: "market",
+      entryPolicy: "A",
+      entryStatus: "filled",
+      entryA: p.entryA,
+      entryB: p.entryB ?? null,
+      slInit: p.sl,
+      stopNow: p.sl,
+      tps: [p.tp1, p.tp2, p.tp3, null, null, null],
+      allocs: [allocs[0], allocs[1], allocs[2], 0,0,0],
+      hits: [false,false,false,false,false,false],
+      events: [],
+      audit: [],
+      date: date,
+      createdAt: iso,
+      filledAt: iso,
+      lastPrice: null,
+      lastPricePrev: null,
+      lastPriceTs: null,
+      closeOnTP1: false,
+      closePct: null,
+      closedAt: null,
+      closePrice: null,
+      closeReason: null,
+      riskOverridePct: (p.risk ?? null),
+      riskR: null
+    };
+
+    if(p.scaleIns && p.scaleIns.length){
+      trade.events = p.scaleIns.map(x=>({ type:"SCALE_IN_PLAN", price:x, ts: iso }));
+    }
+
+    // normalize if app provides
+    try{
+      if(typeof normalizeTrade==="function") {
+        // @ts-ignore
+        const nt = normalizeTrade(trade);
+        if(nt) trade = nt;
+      }
+    }catch(e){}
+
+    // push and save
+    const newTrades = [trade, ...(st.trades||[])];
+    try{
+      if(typeof saveTrades==="function"){
+        saveTrades(newTrades);
+      } else {
+        localStorage.setItem(LTRD, JSON.stringify(newTrades));
+      }
+    }catch(e){
+      localStorage.setItem(LTRD, JSON.stringify(newTrades));
+    }
+
+    try{ if(typeof trades!=="undefined") trades = loadTrades(); }catch(e){}
+    try{ if(typeof renderAll==="function") renderAll(); }catch(e){}
+
+    return trade;
+  }
+
+  // --- BIND UI ---
   async function autoLoadOnce(){
     if(window.__PIF_CLOUD_AUTOLOADED) return;
     window.__PIF_CLOUD_AUTOLOADED = true;
@@ -5132,14 +5674,18 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     try{
       setStatus("Облако: авто‑вход…");
       await ensureAccessToken();
+      await refreshRoleAndProfile();
       await pullNow({silent:true});
     }catch(e){
       setStatus("Облако: авто‑вход не удался (нажми «Войти»)");
-      setDbg("Cloud build: prod-v4 • AUTOLOAD ERROR: " + (e.message||e));
+      setDbg("Cloud build: prod-v5 • AUTOLOAD ERROR: " + (e.message||e));
     }
   }
 
+  let lastParsed = null;
+
   function bindOnce(){
+    // cloud buttons
     const bSave=$("btnCloudSave"), bLogin=$("btnCloudLogin"), bPull=$("btnCloudPull"), bPush=$("btnCloudPush"), bLogout=$("btnCloudLogout");
     const auto=$("cloudAuto");
     if(auto && !auto.__bound){
@@ -5147,15 +5693,73 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
       auto.addEventListener("change", ()=>{ setAuto(auto.checked); if(auto.checked) schedule(); });
       auto.__bound = true;
     }
-    if(bSave && !bSave.__bound){ bSave.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Save"); saveConn(); }); bSave.__bound=true; }
-    if(bLogin && !bLogin.__bound){ bLogin.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Login"); loginRaw().catch(e=>{ alert("Login error: "+(e.message||e)); setStatus("Облако: ошибка логина"); setDbg("Cloud build: prod-v4 • LOGIN ERROR: "+(e.message||e)); }); }); bLogin.__bound=true; }
-    if(bPull && !bPull.__bound){ bPull.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Pull"); pullNow().catch(e=>{ alert("Pull error: "+(e.message||e)); setStatus("Облако: ошибка загрузки"); setDbg("Cloud build: prod-v4 • PULL ERROR: "+(e.message||e)); }); }); bPull.__bound=true; }
-    if(bPush && !bPush.__bound){ bPush.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Push"); pushNow().catch(e=>{ alert("Push error: "+(e.message||e)); setStatus("Облако: ошибка сохранения"); setDbg("Cloud build: prod-v4 • PUSH ERROR: "+(e.message||e)); }); }); bPush.__bound=true; }
-    if(bLogout && !bLogout.__bound){ bLogout.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Logout"); logoutNow(); }); bLogout.__bound=true; }
+    if(bSave && !bSave.__bound){ bSave.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v5 • click Save"); saveConn(); }); bSave.__bound=true; }
+    if(bLogin && !bLogin.__bound){ bLogin.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v5 • click Login"); loginRaw().catch(e=>{ alert("Login error: "+(e.message||e)); setStatus("Облако: ошибка логина"); setDbg("Cloud build: prod-v5 • LOGIN ERROR: "+(e.message||e)); }); }); bLogin.__bound=true; }
+    if(bPull && !bPull.__bound){ bPull.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v5 • click Pull"); pullNow().catch(e=>{ alert("Pull error: "+(e.message||e)); setStatus("Облако: ошибка загрузки"); setDbg("Cloud build: prod-v5 • PULL ERROR: "+(e.message||e)); }); }); bPull.__bound=true; }
+    if(bPush && !bPush.__bound){ bPush.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v5 • click Push"); pushNow().catch(e=>{ alert("Push error: "+(e.message||e)); setStatus("Облако: ошибка сохранения"); setDbg("Cloud build: prod-v5 • PUSH ERROR: "+(e.message||e)); }); }); bPush.__bound=true; }
+    if(bLogout && !bLogout.__bound){ bLogout.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v5 • click Logout"); logoutNow(); }); bLogout.__bound=true; }
 
+    // preload fields
     if($("cloudUrl") && !$("cloudUrl").value) $("cloudUrl").value = localStorage.getItem(K_URL)||"";
     if($("cloudKey") && !$("cloudKey").value) $("cloudKey").value = localStorage.getItem(K_KEY)||"";
     if($("cloudEmail") && !$("cloudEmail").value) $("cloudEmail").value = localStorage.getItem(K_EMAIL)||"";
+
+    // team buttons
+    const btR = $("btnTeamRefresh");
+    if(btR && !btR.__bound){
+      btR.onclick = ()=>loadTraderList();
+      btR.__bound = true;
+    }
+    const btB = $("btnTeamBack");
+    if(btB && !btB.__bound){
+      btB.onclick = async ()=>{
+        const sess = await ensureAccessToken();
+        setViewUser("");
+        setAuto(true);
+        try{ const chk=$("cloudAuto"); if(chk) chk.checked=true; }catch(e){}
+        try{ const banner=$("adminViewBanner"); if(banner) banner.style.display="none"; }catch(e){}
+        await pullNow({silent:true});
+      };
+      btB.__bound = true;
+    }
+
+    // parser buttons
+    const bp = $("btnSigParse");
+    if(bp && !bp.__bound){
+      bp.onclick = ()=>{
+        const raw = $("sigText") ? $("sigText").value : "";
+        lastParsed = parseSignal(raw);
+        if($("sigPreview")) $("sigPreview").textContent = previewParsed(lastParsed);
+        if($("btnSigAdd")) $("btnSigAdd").disabled = !(lastParsed && !lastParsed.warnings.includes("нет symbol") && !lastParsed.warnings.includes("нет side"));
+      };
+      bp.__bound=true;
+    }
+    const ba = $("btnSigAdd");
+    if(ba && !ba.__bound){
+      ba.onclick = ()=>{
+        if(!lastParsed) return;
+        if(lastParsed.warnings && lastParsed.warnings.length){
+          const ok = confirm("Есть предупреждения: " + lastParsed.warnings.join(", ") + "\n\nДобавить всё равно?");
+          if(!ok) return;
+        }
+        const tr = addParsedToJournal(lastParsed);
+        if($("sigPreview")) $("sigPreview").textContent = "Добавлено ✅ trade_id=" + tr.id;
+        if($("sigText")) $("sigText").value = "";
+        lastParsed = null;
+        if($("btnSigAdd")) $("btnSigAdd").disabled = true;
+      };
+      ba.__bound=true;
+    }
+    const bc = $("btnSigClear");
+    if(bc && !bc.__bound){
+      bc.onclick = ()=>{
+        if($("sigText")) $("sigText").value="";
+        if($("sigPreview")) $("sigPreview").textContent="";
+        if($("btnSigAdd")) $("btnSigAdd").disabled=true;
+        lastParsed=null;
+      };
+      bc.__bound=true;
+    }
   }
 
   function loop(){
@@ -5167,6 +5771,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", ()=>{ loop(); setInterval(loop, 800); });
   else { loop(); setInterval(loop, 800); }
 
+  // trigger autosync on localStorage writes
   const _setItem = localStorage.setItem.bind(localStorage);
   localStorage.setItem = function(k,v){
     _setItem(k,v);
@@ -5183,6 +5788,13 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
 
 
 
+
+
+
+  <div id="adminViewBanner" style="display:none; position:fixed; left:12px; right:12px; bottom:12px; z-index:9999;
+    padding:12px 14px; border-radius:14px; background:#2a1414; border:1px solid #6a2b2b; color:#ffd2d2;">
+    <b>ADMIN VIEW MODE</b>: открыт журнал другого трейдера. Автосинхронизация отключена.
+  </div>
 
 </body>
 </html>
