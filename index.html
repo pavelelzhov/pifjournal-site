@@ -1139,7 +1139,7 @@ Tейк-профит
         <div class="card" style="padding:12px">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
             <div>
-              <div style="font-weight:700">☁ Облако (Supabase) — PROD v1</div>
+              <div style="font-weight:700">☁ Облако (Supabase) — PROD v4</div>
               <div class="mini">Автосинхронизация: изменения будут уходить в облако сами (с задержкой ~10 сек).</div>
             </div>
             <label style="display:flex;align-items:center;gap:8px">
@@ -1181,7 +1181,7 @@ Tейк-профит
           </div>
 
           <div id="cloudStatus" class="mini" style="margin-top:8px">Облако: не настроено</div>
-          <div id="cloudDebug" class="mini" style="margin-top:6px; opacity:.85">Cloud build: prod-v3</div>
+          <div id="cloudDebug" class="mini" style="margin-top:6px; opacity:.85">Cloud build: prod-v4</div>
         </div>
 
 <div class="mini">
@@ -4894,20 +4894,19 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
 
 
 
+
 <script>
-/* PIFJOURNAL SUPABASE CLOUD PROD v3 */
+/* PIFJOURNAL SUPABASE CLOUD PROD v4 (AUTOLOAD) */
 (function(){
   function $(id){ return document.getElementById(id); }
   function setDbg(s){ var el=$("cloudDebug"); if(el) el.textContent=s; }
   function setStatus(s){ var el=$("cloudStatus"); if(el) el.textContent=s; }
 
-  // keys
   const K_URL="PIF_SB_URL", K_KEY="PIF_SB_KEY", K_EMAIL="PIF_SB_EMAIL";
   const K_ACCESS="PIF_SB_ACCESS", K_REFRESH="PIF_SB_REFRESH", K_USER="PIF_SB_USER";
   const K_AUTO="PIF_SB_AUTO";
   const K_LAST_PUSH_HASH="PIF_SB_LAST_PUSH_HASH";
 
-  // journal local keys (v12)
   const LCFG = (typeof LS_CFG!=="undefined") ? LS_CFG : "tj.v43.cfg";
   const LTRD = (typeof LS_TRADES!=="undefined") ? LS_TRADES : "tj.v43.trades";
 
@@ -4926,7 +4925,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     localStorage.setItem(K_URL, url);
     localStorage.setItem(K_KEY, key);
     setStatus("Облако: настройки сохранены ✅");
-    setDbg("Cloud build: prod-v3 • conn saved");
+    setDbg("Cloud build: prod-v4 • conn saved");
   }
 
   function getEmailPass(){
@@ -4971,13 +4970,13 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     };
   }
 
-  async function loginRaw(){
+  async function loginRaw(opts){
     const {url,key} = getConn();
-    if(!url || !key){ alert("Сначала нажми «Сохранить облако»"); return; }
+    if(!url || !key){ if(!(opts&&opts.silent)) alert("Сначала нажми «Сохранить облако»"); return; }
     const {email, pass} = getEmailPass();
-    if(!email || !pass){ alert("Введи email и пароль"); return; }
+    if(!email || !pass){ if(!(opts&&opts.silent)) alert("Введи email и пароль"); return; }
     setStatus("Облако: логин…");
-    setDbg("Cloud build: prod-v3 • auth…");
+    setDbg("Cloud build: prod-v4 • auth…");
     const tokenUrl = url.replace(/\/$/,"") + "/auth/v1/token?grant_type=password";
     const tok = await fetchJson(tokenUrl, {
       method:"POST",
@@ -4990,7 +4989,8 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     if(!access || !refresh || !userId) throw new Error("Нет access/refresh/user.id");
     storeSession(access, refresh, userId, email);
     setStatus("Облако: вход выполнен ✅");
-    setDbg("Cloud build: prod-v3 • user=" + userId);
+    setDbg("Cloud build: prod-v4 • user=" + userId);
+    try{ await pullNow({silent:true}); }catch(e){}
   }
 
   async function ensureAccessToken(){
@@ -4998,6 +4998,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     if(sess.access && sess.userId) return sess;
     if(!sess.refresh) return sess;
     const {url,key} = getConn();
+    if(!url || !key) return sess;
     const tokenUrl = url.replace(/\/$/,"") + "/auth/v1/token?grant_type=refresh_token";
     const tok = await fetchJson(tokenUrl, {
       method:"POST",
@@ -5039,7 +5040,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     if(h===last){ if(!(opts&&opts.silent)) setStatus("Облако: уже актуально ✅"); return; }
 
     setStatus("Облако: сохраняю…");
-    setDbg("Cloud build: prod-v3 • push…");
+    setDbg("Cloud build: prod-v4 • push…");
     const restUrl = url.replace(/\/$/,"") + "/rest/v1/tj_v12_state?on_conflict=user_id";
     const payload = [{ user_id: sess.userId, cfg: st.cfg, trades: st.trades }];
     await fetchJson(restUrl, {
@@ -5054,28 +5055,29 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     });
     localStorage.setItem(K_LAST_PUSH_HASH, h);
     setStatus("Облако: сохранено ✅ ("+new Date().toLocaleTimeString()+")");
-    setDbg("Cloud build: prod-v3 • push ok • trades=" + st.trades.length);
+    setDbg("Cloud build: prod-v4 • push ok • trades=" + st.trades.length);
   }
 
-  async function pullNow(){
+  async function pullNow(opts){
     const {url,key} = getConn();
     let sess = await ensureAccessToken();
-    if(!sess.access || !sess.userId){ alert("Сначала «Войти»"); return; }
+    if(!sess.access || !sess.userId){ if(!(opts&&opts.silent)) alert("Сначала «Войти»"); return; }
 
     setStatus("Облако: загружаю…");
-    setDbg("Cloud build: prod-v3 • pull…");
+    setDbg("Cloud build: prod-v4 • pull…");
     const readUrl = url.replace(/\/$/,"") + "/rest/v1/tj_v12_state?select=cfg,trades,updated_at&user_id=eq." + encodeURIComponent(sess.userId);
     const rows = await fetchJson(readUrl, { headers:{ "apikey": key, "Authorization":"Bearer " + sess.access }});
-    if(!rows || !rows.length){ setStatus("Облако: пусто"); return; }
+    if(!rows || !rows.length){
+      setStatus("Облако: пусто");
+      return;
+    }
     const row = rows[0]||{};
     const cloudTrades = Array.isArray(row.trades)?row.trades:[];
     const cloudCfg = row.cfg||{};
 
-    // apply to journal storage keys
     localStorage.setItem(LCFG, JSON.stringify(cloudCfg));
     localStorage.setItem(LTRD, JSON.stringify(cloudTrades));
 
-    // refresh app
     try{ if(typeof cfg!=="undefined") cfg = loadCfg(); }catch(e){}
     try{ if(typeof trades!=="undefined") trades = loadTrades(); }catch(e){}
     try{ if(typeof applyCfgToUI==="function") applyCfgToUI(); }catch(e){}
@@ -5084,16 +5086,15 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
 
     localStorage.setItem(K_LAST_PUSH_HASH, stableHash(getLocalState()));
     setStatus("Облако: загружено ✅ ("+new Date().toLocaleTimeString()+")");
-    setDbg("Cloud build: prod-v3 • pull ok • trades=" + cloudTrades.length);
+    setDbg("Cloud build: prod-v4 • pull ok • trades=" + cloudTrades.length);
   }
 
   function logoutNow(){
     clearSession();
     setStatus("Облако: выход");
-    setDbg("Cloud build: prod-v3 • logout");
+    setDbg("Cloud build: prod-v4 • logout");
   }
 
-  // --- AUTOSYNC ---
   let autoTimer=null;
   function schedule(){
     if(!getAuto()) return;
@@ -5101,7 +5102,6 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     autoTimer=setTimeout(()=>pushNow({silent:true}).catch(()=>{}), 8000);
   }
 
-  // hook saveTrades/saveCfg explicitly (strong trigger)
   function hookSavers(){
     try{
       if(typeof saveTrades==="function" && !saveTrades.__cloudHooked){
@@ -5121,7 +5121,24 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     }catch(e){}
   }
 
-  // rebind buttons periodically (settings can re-render)
+  async function autoLoadOnce(){
+    if(window.__PIF_CLOUD_AUTOLOADED) return;
+    window.__PIF_CLOUD_AUTOLOADED = true;
+
+    const {url,key} = getConn();
+    const sess0 = getSession();
+    if(!url || !key || !sess0.refresh) return;
+
+    try{
+      setStatus("Облако: авто‑вход…");
+      await ensureAccessToken();
+      await pullNow({silent:true});
+    }catch(e){
+      setStatus("Облако: авто‑вход не удался (нажми «Войти»)");
+      setDbg("Cloud build: prod-v4 • AUTOLOAD ERROR: " + (e.message||e));
+    }
+  }
+
   function bindOnce(){
     const bSave=$("btnCloudSave"), bLogin=$("btnCloudLogin"), bPull=$("btnCloudPull"), bPush=$("btnCloudPush"), bLogout=$("btnCloudLogout");
     const auto=$("cloudAuto");
@@ -5130,13 +5147,12 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
       auto.addEventListener("change", ()=>{ setAuto(auto.checked); if(auto.checked) schedule(); });
       auto.__bound = true;
     }
-    if(bSave && !bSave.__bound){ bSave.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v3 • click Save"); saveConn(); }); bSave.__bound=true; }
-    if(bLogin && !bLogin.__bound){ bLogin.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v3 • click Login"); loginRaw().catch(e=>{ alert("Login error: "+(e.message||e)); setStatus("Облако: ошибка логина"); setDbg("Cloud build: prod-v3 • LOGIN ERROR: "+(e.message||e)); }); }); bLogin.__bound=true; }
-    if(bPull && !bPull.__bound){ bPull.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v3 • click Pull"); pullNow().catch(e=>{ alert("Pull error: "+(e.message||e)); setStatus("Облако: ошибка загрузки"); setDbg("Cloud build: prod-v3 • PULL ERROR: "+(e.message||e)); }); }); bPull.__bound=true; }
-    if(bPush && !bPush.__bound){ bPush.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v3 • click Push"); pushNow().catch(e=>{ alert("Push error: "+(e.message||e)); setStatus("Облако: ошибка сохранения"); setDbg("Cloud build: prod-v3 • PUSH ERROR: "+(e.message||e)); }); }); bPush.__bound=true; }
-    if(bLogout && !bLogout.__bound){ bLogout.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v3 • click Logout"); logoutNow(); }); bLogout.__bound=true; }
+    if(bSave && !bSave.__bound){ bSave.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Save"); saveConn(); }); bSave.__bound=true; }
+    if(bLogin && !bLogin.__bound){ bLogin.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Login"); loginRaw().catch(e=>{ alert("Login error: "+(e.message||e)); setStatus("Облако: ошибка логина"); setDbg("Cloud build: prod-v4 • LOGIN ERROR: "+(e.message||e)); }); }); bLogin.__bound=true; }
+    if(bPull && !bPull.__bound){ bPull.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Pull"); pullNow().catch(e=>{ alert("Pull error: "+(e.message||e)); setStatus("Облако: ошибка загрузки"); setDbg("Cloud build: prod-v4 • PULL ERROR: "+(e.message||e)); }); }); bPull.__bound=true; }
+    if(bPush && !bPush.__bound){ bPush.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Push"); pushNow().catch(e=>{ alert("Push error: "+(e.message||e)); setStatus("Облако: ошибка сохранения"); setDbg("Cloud build: prod-v4 • PUSH ERROR: "+(e.message||e)); }); }); bPush.__bound=true; }
+    if(bLogout && !bLogout.__bound){ bLogout.addEventListener("click", ()=>{ setDbg("Cloud build: prod-v4 • click Logout"); logoutNow(); }); bLogout.__bound=true; }
 
-    // load stored conn/email into fields each time they appear
     if($("cloudUrl") && !$("cloudUrl").value) $("cloudUrl").value = localStorage.getItem(K_URL)||"";
     if($("cloudKey") && !$("cloudKey").value) $("cloudKey").value = localStorage.getItem(K_KEY)||"";
     if($("cloudEmail") && !$("cloudEmail").value) $("cloudEmail").value = localStorage.getItem(K_EMAIL)||"";
@@ -5145,12 +5161,12 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
   function loop(){
     bindOnce();
     hookSavers();
+    autoLoadOnce();
   }
 
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded", ()=>{ loop(); setInterval(loop, 800); });
   else { loop(); setInterval(loop, 800); }
 
-  // also hook localStorage writes to tj.* keys
   const _setItem = localStorage.setItem.bind(localStorage);
   localStorage.setItem = function(k,v){
     _setItem(k,v);
@@ -5160,11 +5176,11 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape")
     }catch(e){}
   };
 
-  // optional: push on close (best-effort)
   window.addEventListener("beforeunload", ()=>{ try{ if(getAuto()) pushNow({silent:true}); }catch(e){} });
 
 })();
 </script>
+
 
 
 
